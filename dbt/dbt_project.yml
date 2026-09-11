@@ -1,0 +1,28 @@
+name: me_survey_dashboard
+version: '1.0.0'
+config-version: 2
+
+profile: me_survey_dashboard
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+# Every object carries a me_ prefix. staging / intermediate / marts are shared
+# with the other dashboards on this database, so the prefix — not a private
+# schema — is what keeps these models from colliding. See
+# macros/generate_schema_name.sql for why the schema name is used verbatim.
+models:
+  me_survey_dashboard:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts

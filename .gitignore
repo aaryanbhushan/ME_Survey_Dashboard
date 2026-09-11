@@ -1,0 +1,38 @@
+# Credentials — never commit
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# dbt generated artefacts
+dbt/target/
+dbt/logs/
+dbt/.user.yml
+dbt/dbt_packages/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Logs — including the stdout/stderr files produced when the server is
+# launched detached (Start-Process -RedirectStandardOutput / nohup).
+*.log
+*.out
+*.err
+server.*
+
+# introspect.py writes a dump of the source tables, including sample rows
+# with real employee email addresses in them. Useful locally, never committed.
+introspect_output.txt

@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: mart_me_responses
+    description: >
+      Response grain — one row per (respondent, question, cycle) with every
+      attribute the dashboard slices by joined on. The single read for the
+      Pulse, Themes and Cuts views.
+    columns:
+      - name: cycle
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Sep_24', 'Mar_25', 'Sep_25', 'Mar_26', 'Sep_26']
+              # Sep_26 is a live cycle the retired PBIP never saw. Aug_23 and
+              # Mar_24 stay excluded, as the PBIP's own query excluded them.
+      - name: manager_email
+        tests: [not_null]
+      - name: rating
+        description: >
+          1-4, or NULL for NPS and open-ended rows. NULL is load-bearing —
+          every AVERAGE(rating) relies on it to exclude those rows.
+        tests:
+          - accepted_values:
+              values: [1, 2, 3, 4]
+              config:
+                where: "rating is not null"
+      - name: promoter_detractor
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Promoter', 'Passive', 'Detractor']
+
+  - name: mart_me_manager_cycle
+    description: >
+      One row per (manager, cycle). Replaces four DAX SUMMARIZE tables:
+      ManagerNPS, SummaryThemeScore, Theme Driver and Percentile25_*.
+    columns:
+      - name: manager_email
+        tests: [not_null]
+      - name: me_bucket
+        tests:
+          - accepted_values:
+              values: ['90% & Above', '70%-90%', 'Below 70%']
+              config:
+                where: "me_bucket is not null"

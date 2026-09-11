@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: stg_me_survey_responses
+    description: The ME survey fact, cleaned. The only model touching raw column names.
+    columns:
+      - name: manager_email
+        tests: [not_null]
+      - name: cycle
+        tests: [not_null]
+
+  - name: stg_me_question_theme
+    description: Question -> theme mapping, one row per (question, cycle, target_grade).
+
+  - name: stg_me_dim_employee
+    columns:
+      - name: employee_email
+        tests: [unique, not_null]

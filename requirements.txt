@@ -1,0 +1,18 @@
+dash==4.3.0
+plotly==6.8.0
+pandas>=2.0.0
+numpy>=1.24.0
+waitress==3.0.2
+python-dotenv==1.2.2
+# The -binary wheel, deliberately. Plain `psycopg2` builds from source and
+# needs a C compiler and pg_config on PATH, which a clean Windows box does
+# not have — `pip install -r requirements.txt` fails there. This is the
+# variant the app is actually developed and run against.
+psycopg2-binary==2.9.12
+sshtunnel==0.4.0
+# Pulled in by sshtunnel, pinned explicitly so a resolver change cannot
+# silently drop the SSH transport the whole app depends on.
+paramiko>=3.0.0
+# Required, not optional: the marts the app reads are built by dbt.
+# Installing this puts `dbt` on PATH, which is why DBT_EXE can stay blank.
+dbt-postgres==1.10.2

@@ -1,0 +1,12 @@
+me_survey_dashboard:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "127.0.0.1"
+      port: "{{ env_var('PG_TUNNEL_PORT') | int }}"
+      user: "{{ env_var('PG_USER') }}"
+      pass: "{{ env_var('PG_PASSWORD') }}"
+      dbname: "{{ env_var('PG_DATABASE') }}"
+      schema: marts
+      threads: 4

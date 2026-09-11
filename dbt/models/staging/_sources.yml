@@ -1,0 +1,44 @@
+version: 2
+
+sources:
+  - name: swiggydbo
+    schema: swiggydbo
+    description: Airflow-maintained mirrors of the HR source systems.
+    tables:
+      # ── Managerial Excellence survey ──────────────────────────────────
+      - name: me_survey_response_merged
+        description: >
+          Every ME survey response, one row per (respondent, question),
+          merged across cycles. This is the fact table — the Postgres
+          equivalent of the PBIP's ME_Survey_Response, which assembled the
+          same thing in SQL Server with a CASE-heavy query.
+      - name: me_question_theme_mapping
+        description: >
+          Question -> theme / sub-theme / category / tenet. The PBIP joined
+          this three ways per cycle, once per grade band, because the
+          question text differs by band.
+      - name: me_survey_recipient_merged
+        description: >
+          Who the survey was sent to. Needed for response rate, which the
+          PBIP could not show because it only ever loaded responses.
+      - name: mesurvey_responses
+        description: >
+          Raw survey export. Kept as a source so the merged table can be
+          reconciled against it; not read by any model yet.
+
+      # ── shared across the EX dashboards ───────────────────────────────
+      - name: pg_dim_employee
+        description: Employee master. Refreshed daily.
+      - name: pms_rating
+        description: >
+          Performance ratings, one row per (employee, review cycle). The only
+          populated source of the PMS rating the "by rating" cut needs —
+          dim_employee.latest_rating, which the PBIP read, is NULL for every
+          row in Postgres.
+      - name: pg_manager_hierarchy
+        description: >
+          Reporting line, TOP-DOWN — l1_id is the CEO. Holds employee IDs.
+      - name: pg_hrbp_hierarchy
+        description: >
+          HRBP line, BOTTOM-UP — l1_hrbp_email is the immediate HRBP. Holds
+          emails. Opposite orientation to pg_manager_hierarchy.
