@@ -39,13 +39,14 @@ def layout(cycle=None, tag=None, mgr=None, **params):
         PC.active_chips(cycle, filters, '/queue', {'tag': tag}),
         C.section(
             f'Action queue · {D.CYCLE_LABEL.get(cycle, cycle)}',
-            note=f"{len(rows)} of {C.num(h['below_p25'])} below-quartile managers",
-            desc='Managers scoring below the 25th percentile for their own '
-                 'grade — the report’s own bottom-quartile rule, not a raw '
-                 'score cut-off, because 3.30 means something different at '
-                 'grade 4 than at grade 11. Ranked by how far below the bar '
-                 'they sit multiplied by how many people that affects. Click a '
-                 'row for the full breakdown.',
+            note=f"{len(rows)} of {C.num(h['below_p25'])} in the bottom quarter",
+            desc='Managers in the weakest quarter for their own grade — not a '
+                 'raw score cut-off, because 3.30 means something different '
+                 'at grade 4 than at grade 11. Ranked by how far below the '
+                 'bar they sit multiplied by how many people that affects. '
+                 'Click a row for the full breakdown. The comparison is made '
+                 'within grade and across scored managers only, which is '
+                 'stricter than the retired report’s single org-wide cut.',
             children=[
                 html.Div(pills, className='pillbtns'),
                 html.Div([_row(i, r, cycle, tag) for i, r in enumerate(shown)]),

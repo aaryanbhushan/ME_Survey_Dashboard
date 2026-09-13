@@ -48,15 +48,38 @@ def _hero_band(cycle, h, p, cycles, all_h, fk=()):
     strongest = th[-1] if th else None
     weakest = th[0] if th else None
 
+    # Each is a compressed number, so each carries what it counts in a native
+    # title tooltip. "BELOW GRADE P25" used to head the fifth one — a
+    # percentile is not something a reader should have to decode to know
+    # whether 171 is good or bad.
     mini = [
-        ('MANAGER NPS', C.fmt(h['nps'], 1), 'var(--good)' if (h['nps'] or 0) >= 40 else 'var(--bad)'),
-        ('NEGATIVE-NPS MANAGERS', C.fmt(h['neg_nps_pct'], 1) + '%', 'var(--bad)'),
-        ('STRONGEST THEME', C.fmt(strongest['score']) if strongest else '--', 'var(--good)'),
-        ('WEAKEST THEME', C.fmt(weakest['score']) if weakest else '--', 'var(--bad)'),
-        ('BELOW GRADE P25', C.num(h['below_p25']), 'var(--warn)'),
+        ('MANAGER NPS', C.fmt(h['nps'], 1),
+         'var(--good)' if (h['nps'] or 0) >= 40 else 'var(--bad)',
+         'Promoters minus detractors, as a share of everyone who answered the '
+         '0–10 "would you recommend your manager" question.'),
+        ('NEGATIVE-NPS MANAGERS', C.fmt(h['neg_nps_pct'], 1) + '%',
+         'var(--bad)',
+         f"{C.num(h['neg_nps_managers'])} of {C.num(h['managers'])} rated "
+         f"managers have more detractors than promoters."),
+        ('STRONGEST THEME', C.fmt(strongest['score']) if strongest else '--',
+         'var(--good)',
+         f"{strongest['theme']} — the highest of the six theme scores, out "
+         f"of 4." if strongest else 'No theme scores in this cycle.'),
+        ('WEAKEST THEME', C.fmt(weakest['score']) if weakest else '--',
+         'var(--bad)',
+         f"{weakest['theme']} — the lowest of the six theme scores, out of 4."
+         if weakest else 'No theme scores in this cycle.'),
+        ('BOTTOM 25% OF THEIR GRADE', C.num(h['below_p25']), 'var(--warn)',
+         f"{C.num(h['below_p25'])} scored managers sit in the weakest quarter "
+         f"for their OWN grade. Compared within grade because 3.30 means "
+         f"something different at G4 than at G11. These are the managers the "
+         f"Action Queue ranks."),
         ('SCORED OF RATED',
          f"{round(h['visible_managers'] / h['managers'] * 100)}%" if h['managers'] else '--',
-         'var(--warn)'),
+         'var(--warn)',
+         f"{C.num(h['visible_managers'])} of {C.num(h['managers'])} rated "
+         f"managers had at least 3 people rate them, which is the minimum for "
+         f"a score to be shown at all."),
     ]
 
     hero = html.Div([
@@ -77,8 +100,9 @@ def _hero_band(cycle, h, p, cycles, all_h, fk=()):
         html.Div(className='rule'),
         html.Div([
             html.Div([C.ml(label, small=True),
-                      html.Div(value, className='v', style={'color': colour})])
-            for label, value, colour in mini
+                      html.Div(value, className='v', style={'color': colour})],
+                     title=tip)
+            for label, value, colour, tip in mini
         ], className='mini'),
     ], className='pane')
 
