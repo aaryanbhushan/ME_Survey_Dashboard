@@ -387,8 +387,25 @@ so a manager who changed BU has their historical responses counted under their
 current one. The report did the same, so the numbers still reconcile, but say
 so if a BU trend is questioned. `EMPLOYEE_TIME_SERIES` may be a route.
 
-**4. Startup reads ~644k rows every time.** An incremental or narrower mart
-read would cut the cold start.
+**4. Startup reads ~644k rows every time**, which is still a ~3 minute cold
+start over the tunnel. The *memory* half of this is fixed — see
+`data.responses()` — but the read itself is unchanged, so an incremental mart
+read is still the outstanding piece.
+
+On memory, for anyone tempted to re-tune it: the frame is read **in chunks**,
+each converted to categoricals against a shared category set, and only the 33
+columns the pages actually use. That takes resident memory from **2.0 GB to
+~200 MB**. Three things there are load-bearing and look optional:
+
+- Converting *after* a plain `select *` read instead only saves ~10%, because
+  RSS is set by the read's peak and Python never returns that to the OS.
+- The category sets must be **sorted**. `groupby` on a categorical iterates in
+  category order, so an unsorted set silently re-breaks ties in every
+  `sorted(...)` in `data.py`.
+- The text columns are read from `information_schema`, not listed by hand.
+  `manager_latest_rating` is an `integer` despite its name, and building a
+  categorical over it with string categories turns every value into NaN
+  without raising — which empties the PMS rating picker on every page.
 
 **5. The Manager dropdown carries ~1,700 options**, pushing each page payload
 to ~250KB.

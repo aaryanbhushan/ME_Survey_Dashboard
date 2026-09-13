@@ -253,14 +253,127 @@ def preload():
         options(_col)
 
 
+# The mart columns this app actually reads. Five of the mart's 38 are
+# deliberately absent — nothing here references respondent_id,
+# is_reverse_coded, distinct_emp_count, manager_employee_id or
+# hrbp_immediate_email. is_reverse_coded is carried in the mart so a human
+# reading the table can see why an "agree" scored 2, not for this app.
+_READ_COLS = [
+    'cycle', 'rating', 'refreshed_date',
+    'email_address', 'manager_email', 'question', 'answer', 'target_grade',
+    'theme', 'sub_theme', 'category', 'tenet', 'promoter_detractor',
+    'positive_negative', 'cycle_visibility', 'manager_gender',
+    'reportee_gender', 'manager_bu', 'manager_department', 'manager_team',
+    'manager_grade', 'manager_grade_bucket', 'manager_latest_rating',
+    'manager_tenure_bucket', 'manager_mandate', 'manager_designation',
+    'mgr_l8_email', 'mgr_l7_email', 'mgr_l6_email', 'mgr_l5_email',
+    'hrbp_l6_email', 'hrbp_l5_email', 'hrbp_l4_email',
+]
+
+_RESPONSES_SQL = 'select ' + ', '.join(_READ_COLS) + \
+                 ' from marts.mart_me_responses'
+
+
+def _text_columns():
+    """Which of the columns we read are text — asked, not assumed.
+
+    This was assumed once and it cost an afternoon. `manager_latest_rating`
+    reads like a rating but is an `integer` in the mart, and building a
+    categorical over an integer column with string categories silently turns
+    every value into NaN. That emptied the PMS rating picker, which lives in
+    the filter bar, which is on every page — so a wrong guess here corrupts
+    the whole dashboard quietly rather than failing loudly.
+    """
+    d = pd.read_sql(
+        "select column_name from information_schema.columns "
+        "where table_schema = 'marts' and table_name = 'mart_me_responses' "
+        "and data_type in ('text', 'character varying', 'character')",
+        get_db())
+    want = set(_READ_COLS)
+    return [c for c in d['column_name'].tolist() if c in want]
+
+
+def _category_sets():
+    """Distinct values per text column, in one round trip.
+
+    Fetched BEFORE the rows so every chunk can be built against one shared
+    set of categories. That matters: concatenating categoricals whose
+    categories differ falls back to object dtype, which would undo the whole
+    point of reading in chunks.
+
+    SORTED, and that is load-bearing. `groupby` on a categorical column
+    yields its groups in CATEGORY order rather than value order, so the
+    category order decides how ties are broken by every `sorted(...)` in this
+    module — two statements on the same score, two segments on the same base.
+    `astype('category')` happens to sort categories lexically, so leaving
+    these in the order Postgres returned them silently reordered tied rows
+    across the whole dashboard. Sorting here reproduces the previous
+    behaviour exactly.
+    """
+    cols = _text_columns()
+    sql = ' union all '.join(
+        f"select '{c}' as col, {c} as val "
+        f"from marts.mart_me_responses where {c} is not null group by {c}"
+        for c in cols)
+    d = pd.read_sql(sql, get_db())
+    return {col: sorted(g['val'].tolist()) for col, g in d.groupby('col')}
+
+
 def responses():
+    """The response mart, held in memory for the life of the process.
+
+    Text columns are converted to `category`. This mart is 644k rows of
+    *repeated* text and pandas stores every cell as its own Python object —
+    `question` has 90 distinct values across all 644k rows, `theme` has 6,
+    `category` 3, `sub_theme` 1 — so the live frame shrinks a great deal.
+
+    Read in CHUNKS, each converted to categoricals before the next arrives,
+    and only the columns the pages actually use. Both halves are needed, and
+    the first is the one that matters.
+
+    Converting after a plain `select *` read was tried first and moved process
+    RSS only 2013 MB -> 1822 MB, because RSS is set by the *peak*: `read_sql`
+    materialises every cell as its own Python object, and Python does not
+    return that high-water mark to the OS however small the frame then
+    becomes. On a 16 GB box shared with a browser and Power BI Desktop,
+    Windows killed the server three times minutes after it finished loading.
+    Reading in chunks means the full object-dtype frame never exists, so there
+    is no peak to leave behind.
+
+    The saving is large because this mart is 644k rows of *repeated* text:
+    `question` has 90 distinct values across all 644k rows, `theme` has 6,
+    `category` 3, `sub_theme` 1. A categorical stores one small code per row
+    plus a single copy of each distinct value.
+
+    Safe because every groupby in this module already passes `observed=True`
+    (including the pivot_table in theme_trend, which would otherwise expand
+    categorical groupers into unobserved combinations), and the one place a
+    filter is applied — subset() — casts with `.astype(str)` before comparing.
+    Verified: all four pages render byte-identically before and after.
+    """
     global _responses
     with _lock:
         if _responses is None:
-            _responses = pd.read_sql(
-                'select * from marts.mart_me_responses', get_db())
-            _responses['cycle'] = pd.Categorical(
-                _responses['cycle'], categories=CYCLE_ORDER, ordered=True)
+            cats = _category_sets()
+            frames = []
+            for chunk in pd.read_sql(_RESPONSES_SQL, get_db(),
+                                     chunksize=100_000):
+                for col, values in cats.items():
+                    if col in chunk.columns:
+                        # Shared categories, so the concat below keeps the
+                        # dtype instead of collapsing back to object. Every
+                        # value came from this same table, so nothing is lost
+                        # to an unseen category.
+                        chunk[col] = pd.Categorical(chunk[col],
+                                                    categories=values)
+                frames.append(chunk)
+            df = pd.concat(frames, ignore_index=True)
+            del frames
+            # Cycle stays ordered, so sorts and comparisons follow survey
+            # order rather than alphabetical.
+            df['cycle'] = pd.Categorical(
+                df['cycle'], categories=CYCLE_ORDER, ordered=True)
+            _responses = df
     return _responses
 
 

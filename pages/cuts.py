@@ -289,10 +289,18 @@ def _coverage(cycle, fk=()):
             html.Td(C.num(c['respondents']), className='r mono'),
             html.Td(C.num(c['managers']), className='r mono'),
             html.Td(C.num(c['visible']), className='r mono'),
-            html.Td(html.Span(f"{c['share']:.0f}%",
-                              className='chip ' + ('b-ok' if (c['share'] or 0) >= 60
-                                                   else 'b-warn')),
-                    className='r'),
+            # share is None when the filtered population has no managers in
+            # this cycle at all — which happens the moment you filter to a
+            # single manager who did not appear in every cycle. Formatting
+            # that with ':.0f' raised "unsupported format string passed to
+            # NoneType.__format__" and took the whole page down. A dash, and
+            # no chip colour, because there is nothing to rate.
+            html.Td(html.Span(
+                '--' if c['share'] is None else f"{c['share']:.0f}%",
+                className='chip ' + ('b-none' if c['share'] is None
+                                     else 'b-ok' if c['share'] >= 60
+                                     else 'b-warn')),
+                className='r'),
         ], title='\n'.join([
             D.CYCLE_LABEL.get(c['cycle'], c['cycle']),
             f"{c['respondents']:,} respondents",
